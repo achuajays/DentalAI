@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import List
 from dotenv import load_dotenv
+from routes.Rag_page import RAGSystem
 
 # Load environment variables
 load_dotenv()
@@ -60,11 +61,21 @@ async def analyze_scan(image: Image.Image) -> str:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Scan analysis failed: {str(e)}")
 
+db_config = {
+            "dbname": "mydatabase",
+            "user": "myuser",
+            "password": "mypassword",
+            "host": "localhost",
+            "port": 5432
+        }
+
 @router.post("/upload")
 async def upload_and_analyze_scan(file: UploadFile = File(...)):
     """
     Upload a single dental scan file, analyze it, and delete it afterward
     """
+    rag_system = RAGSystem()
+
     file_path = None
     try:
         # Validate file extension
@@ -94,14 +105,16 @@ async def upload_and_analyze_scan(file: UploadFile = File(...)):
 
         # Analyze the scan
         analysis_result = await analyze_scan(image)
-
+        relevant_text = rag_system.fetch_relevant_text("Scan",analysis_result)
+        print(relevant_text)
+        analysis = rag_system.get_answer_from_gpt(analysis_result, relevant_text)
         # Metadata and analysis result
         metadata = {
             "filename": filename,
             "original_filename": file.filename,
             "size_bytes": file_size,
             "upload_time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "analysis": analysis_result
+            "analysis": analysis
         }
 
         # Delete the file after analysis

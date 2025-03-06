@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routes import items , Xray_checking , treatment_plan , Scan_dental , report_summary , exercise_fetch , Ai_scribe , soap_note , Email_sender
+from routes import items , Xray_checking , treatment_plan , Scan_dental , report_summary , exercise_fetch , Ai_scribe , soap_note , Email_sender  , Add_Data , auth  , Bolna , appoinment , integration
 from cors_config import add_cors
 
 
@@ -22,6 +22,11 @@ app.include_router(exercise_fetch.router)
 app.include_router(Ai_scribe.router)
 app.include_router(soap_note.router)
 app.include_router(Email_sender.router)
+app.include_router(Add_Data.router)
+app.include_router(auth.router)
+app.include_router(Bolna.router)
+app.include_router(appoinment.router)
+app.include_router(integration.router)
 
 
 @app.get("/")

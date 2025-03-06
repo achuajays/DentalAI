@@ -4,6 +4,8 @@ from PIL import Image
 import io
 import os
 from dotenv import load_dotenv
+from routes.Rag_page import RAGSystem
+
 
 # Load environment variables
 load_dotenv()
@@ -13,6 +15,17 @@ router = APIRouter(
     tags=["xray-analysis"],
     responses={404: {"description": "Not found"}}
 )
+
+
+db_config = {
+            "dbname": "mydatabase",
+            "user": "myuser",
+            "password": "mypassword",
+            "host": "localhost",
+            "port": 5432
+        }
+
+
 
 # Configure Gemini API
 genai.configure(api_key=os.getenv("Gemini_api_key"))
@@ -34,6 +47,8 @@ Use technical dental terminology and provide a structured response.
 @router.post("/analyze")
 async def analyze_xray(file: UploadFile = File(...)):
     try:
+        rag_system = RAGSystem()
+
         # Validate file type
         if not file.content_type.startswith('image/'):
             raise HTTPException(status_code=400, detail="Please upload an image file")
@@ -55,9 +70,14 @@ async def analyze_xray(file: UploadFile = File(...)):
         )
 
         # Structure the response
+
+        relevant_text = rag_system.fetch_relevant_text( "Xray" , response.text)
+        print(relevant_text)
+        analysis = rag_system.get_answer_from_gpt(response.text, relevant_text)
+        rag_system.close()
         analysis_result = {
             "filename": file.filename,
-            "analysis": response.text.replace("\n", "").replace("\r", "").replace("**", " "),
+            "analysis": analysis.replace("\n", "").replace("\r", "").replace("**", " "),
         }
 
         return analysis_result
