@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcribe Audio With FastAPI</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        h1 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            text-align: center;
+        }
+        #status {
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+        }
+        #transcript {
+            white-space: pre-wrap;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #bdc3c7;
+            padding: 15px;
+            background-color: #ffffff;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        button {
+            margin: 0 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        #startBtn {
+            background-color: #2ecc71;
+        }
+        #startBtn:hover {
+            background-color: #27ae60;
+        }
+        #pauseBtn {
+            background-color: #f39c12;
+        }
+        #pauseBtn:hover {
+            background-color: #d35400;
+        }
+        #stopBtn {
+            background-color: #e74c3c;
+        }
+        #stopBtn:hover {
+            background-color: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <h1>Transcribe Audio With FastAPI</h1>
+    <p id="status">Ready to connect</p>
+    <div id="controls">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn" disabled>Pause</button>
+        <button id="stopBtn" disabled>Stop</button>
+    </div>
+    <div id="transcript"></div>
+
+    <script>
+        (function() {
+    const apptId = 110; // Static appointment ID
+    const statusElement = document.getElementById('status');
+    const transcriptElement = document.getElementById('transcript');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    let transcriptBuffer = '';
+    let mediaRecorder;
+    let socket;
+    let stream;
+    let keepAliveInterval;
+    let messageType = 'local'; // Initialize message type
+
+    // Throttle function to limit DOM updates
+    function throttle(fn, limit) {
+        let lastCall = 0;
+        return function(...args) {
+            const now = new Date().getTime();
+            if (now - lastCall >= limit) {
+                lastCall = now;
+                return fn(...args);
+            }
+        };
+    }
+
+    // Update transcript with throttling
+    const updateTranscript = throttle(() => {
+        transcriptElement.textContent = transcriptBuffer;
+    }, 500);
+
+    function startRecording() {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((audioStream) => {
+            stream = audioStream;
+            if (!MediaRecorder.isTypeSupported('audio/webm')) {
+                return alert('Browser not supported');
+            }
+
+            mediaRecorder = new MediaRecorder(stream, {
+                mimeType: 'audio/webm',
+            });
+
+            socket = new WebSocket('ws://192.168.56.1:8000/ws');
+
+            socket.onopen = () => {
+                statusElement.textContent = 'Connected';
+                mediaRecorder.start(500);
+                mediaRecorder.addEventListener('dataavailable', (event) => {
+                    if (event.data.size > 0 && socket.readyState === 1) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            const audioBase64 = reader.result.split(',')[1];
+                            const message = {
+                                audio: audioBase64,
+                            };
+
+                            socket.send(JSON.stringify(message));
+
+                            // Toggle message type between 'local' and 'remote'
+                            messageType = messageType === 'local' ? 'remote' : 'local';
+                        };
+                        reader.readAsDataURL(event.data);
+                    }
+                });
+                startBtn.disabled = true;
+                pauseBtn.disabled = false;
+                stopBtn.disabled = false;
+            };
+
+            socket.onmessage = (message) => {
+                const received = JSON.parse(message.data);
+                if (received.transcription) {
+                    transcriptBuffer += ' ' + received.transcription;
+                    updateTranscript();
+                }
+            };
+
+            socket.onclose = () => {
+                statusElement.textContent = 'Connection closed';
+                clearInterval(keepAliveInterval);
+                resetButtons();
+            };
+
+            socket.onerror = (error) => {
+                statusElement.textContent = 'Error occurred';
+                console.error('WebSocket error:', error);
+                clearInterval(keepAliveInterval);
+                resetButtons();
+            };
+        }).catch((err) => {
+            statusElement.textContent = 'Failed to access microphone';
+            console.error('Microphone error:', err);
+            resetButtons();
+        });
+    }
+
+    function pauseRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.pause();
+            statusElement.textContent = 'Paused';
+            pauseBtn.textContent = 'Resume';
+            // Start sending keep-alive messages every 1 second
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                keepAliveInterval = setInterval(() => {
+                    const keepAliveMessage = {
+                        "type": "KeepAlive"
+                    };
+                    socket.send(JSON.stringify(keepAliveMessage));
+                }, 1000);
+            }
+        } else if (mediaRecorder && mediaRecorder.state === 'paused') {
+            mediaRecorder.resume();
+            statusElement.textContent = 'Recording';
+            pauseBtn.textContent = 'Pause';
+            // Stop sending keep-alive messages
+            clearInterval(keepAliveInterval);
+        }
+    }
+
+    function stopRecording() {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+            stream.getTracks().forEach(track => track.stop());
+        }
+        if (socket) {
+            socket.close();
+        }
+        statusElement.textContent = 'Stopped';
+        clearInterval(keepAliveInterval);
+        resetButtons();
+    }
+
+    function resetButtons() {
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = true;
+        pauseBtn.textContent = 'Pause';
+        clearInterval(keepAliveInterval);
+    }
+
+    startBtn.addEventListener('click', startRecording);
+    pauseBtn.addEventListener('click', pauseRecording);
+    stopBtn.addEventListener('click', stopRecording);
+})();
+    </script>
+</body>
+</html>
