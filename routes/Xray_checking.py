@@ -77,7 +77,7 @@ async def analyze_xray(file: UploadFile = File(...)):
         rag_system.close()
         analysis_result = {
             "filename": file.filename,
-            "analysis": analysis.replace("\n", "").replace("\r", "").replace("**", " "),
+            "analysis": analysis,
         }
 
         return analysis_result
