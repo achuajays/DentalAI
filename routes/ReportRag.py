@@ -33,14 +33,12 @@ async def analyze_xray(text: str):
         response = client.models.generate_content(
             model="gemini-2.0-flash",
             contents=[f"""You are an AI assistant that performs retrieval-augmented generation (RAG) to answer questions based on the provided knowledge base. Follow these steps:
-
-Retrieve relevant content from the RAG knowledge source.
 Check if the retrieved content directly answers the user's question.
 If an answer is found, generate a clear and concise response based only on the retrieved content.
-If no relevant information is found, respond with: 'No idea.'
+If no relevant information is found, respond with: 'No idea.' .  Never Miss any data
 Now, answer the following question based on the available RAG content:
 
-User Question - {text} , Extracted content - {relevant_text}"""])
+User Question - {text} , retrieved content - {relevant_text}"""])
 
         print(response.text)
         rag_system.close()
