@@ -42,7 +42,7 @@ class RAGSystem:
                 SELECT text 
                 FROM evaluation WHERE type = %s
                 ORDER BY vector <=> %s::vector
-                LIMIT 3;
+                LIMIT 5;
             """, (type,query_embedding,))
 
             results = self.cur.fetchall()
