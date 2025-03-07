@@ -92,7 +92,7 @@ HTML_TEMPLATE = """
                 <p><strong>Name:</strong> Dental Care Hospital</p>
                 <p><strong>Address:</strong> 123 Health Street, Suite 100, Wellness City, WC 12345</p>
                 <p><strong>Contact:</strong> (555) 123-4567 | <a href="mailto:info@dentalcarehospital.com">info@dentalcarehospital.com</a></p>
-                <p><strong>Website:</strong> <a href="https://www.dentalcarehospital.com">www.dentalcarehospital.com</a></p>
+                <p><strong>Website:</strong> <a href="https://dentalai-frontend-production.up.railway.app/">www.dentalcarehospital.com</a></p>
             </div>
             <p>Please visit us at your earliest convenience. If you need to reschedule, feel free to contact us using the details above.</p>
             <p>Thank you for choosing Dental Care Hospital!</p>
